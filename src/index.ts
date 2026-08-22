@@ -9,6 +9,7 @@ async function main() {
   const io = createConsoleIO();
 
   io.write("provider=" + config.provider + " url=" + config.url);
+  io.write("headless=" + config.headless + " browser=" + config.browser);
 
   const { page, close } = await createBrowser(config);
   const client = createChatClient(page, config);
