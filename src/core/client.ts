@@ -1,6 +1,6 @@
-﻿import type { Page } from 'playwright';
-import type { AppConfig, ChatClient, ProviderName } from './types.js';
-import { createXGrokClient } from '../providers/x-grok.js';
+import type { Page } from 'playwright';
+import type { AppConfig, ChatClient, ProviderName } from './types.ts';
+import { createXGrokClient } from '../providers/x-grok.ts';
 
 type ClientFactory = (page: Page, url: string) => ChatClient;
 

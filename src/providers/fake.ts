@@ -1,4 +1,4 @@
-﻿import type { ChatClient } from '../core/types.js';
+import type { ChatClient } from '../core/types.ts';
 
 export function createFakeChatClient(options?: {
   responses?: string[];

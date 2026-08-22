@@ -1,6 +1,6 @@
-﻿import * as readline from 'node:readline/promises';
+import * as readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
-import type { SessionIO } from '../core/types.js';
+import type { SessionIO } from '../core/types.ts';
 
 export function createConsoleIO(): SessionIO & { close: () => Promise<void> } {
   const rl = readline.createInterface({ input, output });
