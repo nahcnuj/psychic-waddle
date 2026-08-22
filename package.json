@@ -5,7 +5,8 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "test": "tsx --test src/**/*.test.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
   },
   "repository": {
     "type": "git",

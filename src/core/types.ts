@@ -1,4 +1,4 @@
-﻿export type ProviderName = 'x-grok'; // 増やすときはここに追加
+﻿export type ProviderName = 'x-grok';
 
 export interface AppConfig {
   provider: ProviderName;
@@ -11,19 +11,14 @@ export interface AppConfig {
 export interface ChatClient {
   readonly name: string;
   readonly url: string;
-
-  /** 指定URLを開く */
   open(): Promise<void>;
-
-  /** プロンプトを送信する */
   sendPrompt(prompt: string): Promise<void>;
-
-  /** 応答が安定するまで待ってテキストを返す */
   waitForResponse(timeoutMs?: number): Promise<string>;
-
-  /** 新しいチャットを開始する（任意） */
   newChat?(): Promise<void>;
-
-  /** 現在の会話履歴を取得する（任意） */
   getHistory?(): Promise<string[]>;
 }
+
+export type SessionIO = {
+  read: (prompt: string) => Promise<string>;
+  write: (message: string) => void;
+};

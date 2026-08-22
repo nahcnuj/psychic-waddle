@@ -1,10 +1,10 @@
 ﻿export const logger = {
-  info: (msg: string) => console.log([INFO] ),
-  warn: (msg: string) => console.warn([WARN] ),
-  error: (msg: string) => console.error([ERROR] ),
-  prompt: (msg: string) => console.log(\nあなた > ),
+  info: (msg: string) => console.log('[INFO] ' + msg),
+  warn: (msg: string) => console.warn('[WARN] ' + msg),
+  error: (msg: string) => console.error('[ERROR] ' + msg),
   response: (msg: string) => {
-    console.log('\nGrok >');
+    console.log('');
+    console.log('Grok >');
     console.log(msg);
     console.log('');
   },

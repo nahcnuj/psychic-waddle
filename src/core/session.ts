@@ -1,43 +1,55 @@
-﻿import * as readline from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
-import type { ChatClient } from './types.js';
-import { logger } from '../utils/logger.js';
+﻿import type { ChatClient, SessionIO } from './types.js';
 
-export async function runSession(client: ChatClient, responseTimeoutMs: number): Promise<void> {
-  const rl = readline.createInterface({ input, output });
+export type SessionOptions = {
+  responseTimeoutMs: number;
+};
 
+export async function runSession(
+  client: ChatClient,
+  io: SessionIO,
+  options: SessionOptions
+): Promise<void> {
   await client.open();
 
-  console.log('========================================');
-  console.log(Provider: );
-  console.log(URL: );
-  console.log('ブラウザでログインし、Grokが使える状態にしてください。');
-  console.log('準備ができたら Enter を押してください。');
-  console.log('終了するには exit または quit と入力してください。');
-  console.log('========================================\n');
+  io.write('========================================');
+  io.write('Provider: ' + client.name);
+  io.write('URL: ' + client.url);
+  io.write('ブラウザでログインし、Grokが使える状態にしてください。');
+  io.write('準備ができたら Enter を押してください。');
+  io.write('終了するには exit または quit と入力してください。');
+  io.write('========================================');
 
-  await rl.question('');
+  await io.read('');
 
-  console.log('\nループを開始します。\n');
+  io.write('');
+  io.write('ループを開始します。');
+  io.write('');
 
   while (true) {
-    const prompt = (await rl.question('あなた > ')).trim();
-    if (!prompt) continue;
-    if (['exit', 'quit'].includes(prompt.toLowerCase())) break;
+    const prompt = (await io.read('あなた > ')).trim();
+    if (!prompt) {
+      continue;
+    }
+    if (prompt.toLowerCase() === 'exit' || prompt.toLowerCase() === 'quit') {
+      break;
+    }
 
     try {
-      logger.info('送信中...');
+      io.write('送信中...');
       await client.sendPrompt(prompt);
 
-      logger.info('応答待ち...');
-      const response = await client.waitForResponse(responseTimeoutMs);
+      io.write('応答待ち...');
+      const response = await client.waitForResponse(options.responseTimeoutMs);
 
-      logger.response(response);
+      io.write('');
+      io.write('Grok >');
+      io.write(response);
+      io.write('');
     } catch (err) {
-      logger.error(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      io.write('[ERROR] ' + message);
     }
   }
 
-  await rl.close();
-  console.log('セッションを終了しました。');
+  io.write('セッションを終了しました。');
 }
