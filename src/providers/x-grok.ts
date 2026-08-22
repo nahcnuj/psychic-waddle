@@ -1,6 +1,6 @@
 ﻿import type { Page, Locator } from "playwright";
 import type { ChatClient } from "../core/types.ts";
-import { sleep } from "../utils/wait.ts";
+import { setTimeout as sleep } from 'node:timers/promises';
 import { filterModelLabels, isRateLimited } from "./model-utils.ts";
 
 export { isRateLimited, filterModelLabels };

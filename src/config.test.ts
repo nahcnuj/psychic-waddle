@@ -12,27 +12,26 @@ describe("loadConfig", () => {
   });
 
   it("accepts --headed", () => {
-    const c = loadConfig(["--headed"]);
-    assert.equal(c.headless, false);
+    assert.equal(loadConfig(["--headed"]).headless, false);
   });
 
   it("accepts --timeout", () => {
-    const c = loadConfig(["--timeout", "12345"]);
-    assert.equal(c.responseTimeoutMs, 12345);
+    assert.equal(loadConfig(["--timeout", "12345"]).responseTimeoutMs, 12345);
   });
 
   it("accepts --url override", () => {
-    const c = loadConfig(["--url", "https://example.com"]);
-    assert.equal(c.url, "https://example.com");
+    assert.equal(loadConfig(["--url", "https://example.com"]).url, "https://example.com");
   });
 
   it("accepts --cdp", () => {
-    const c = loadConfig(["--cdp", "http://127.0.0.1:9222"]);
-    assert.equal(c.cdpUrl, "http://127.0.0.1:9222");
+    assert.equal(loadConfig(["--cdp", "http://127.0.0.1:9222"]).cdpUrl, "http://127.0.0.1:9222");
   });
 
   it("accepts --browser vivaldi", () => {
-    const c = loadConfig(["--browser", "vivaldi"]);
-    assert.equal(c.browser, "vivaldi");
+    assert.equal(loadConfig(["--browser", "vivaldi"]).browser, "vivaldi");
+  });
+
+  it("throws on unknown browser", () => {
+    assert.throws(() => loadConfig(["--browser", "nope"]), /Unknown browser/);
   });
 });
