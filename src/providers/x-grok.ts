@@ -1,7 +1,6 @@
 ﻿import type { Page } from 'playwright';
 import type { ChatClient } from '../core/types.js';
 import { sleep } from '../utils/wait.js';
-import { logger } from '../utils/logger.js';
 
 const INPUT_SELECTORS = [
   'textarea[placeholder*="Ask"]',
@@ -26,7 +25,6 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
     url,
 
     async open() {
-      logger.info(ページを開きます: );
       await page.goto(url, { waitUntil: 'domcontentloaded' });
     },
 
@@ -34,14 +32,16 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
       let input = null;
       for (const selector of INPUT_SELECTORS) {
         const locator = page.locator(selector).last();
-        if ((await locator.count()) > 0 && (await locator.isVisible().catch(() => false))) {
+        const count = await locator.count();
+        const visible = count > 0 ? await locator.isVisible().catch(() => false) : false;
+        if (visible) {
           input = locator;
           break;
         }
       }
 
       if (!input) {
-        throw new Error('入力欄が見つかりませんでした');
+        throw new Error('Input field not found');
       }
 
       await input.click();
@@ -50,7 +50,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
       await page.keyboard.press('Enter');
     },
 
-    async waitForResponse(timeoutMs = 90_000) {
+    async waitForResponse(timeoutMs = 90000) {
       const start = Date.now();
       let lastText = '';
       let stableCount = 0;
@@ -74,7 +74,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
         }
 
         if (text && text === lastText) {
-          stableCount++;
+          stableCount += 1;
           if (stableCount >= 4) {
             return text;
           }
@@ -86,7 +86,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
         await sleep(1000);
       }
 
-      throw new Error('応答の取得がタイムアウトしました');
+      throw new Error('Timed out waiting for response');
     },
   };
 }

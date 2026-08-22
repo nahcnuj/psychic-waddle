@@ -10,17 +10,17 @@ export async function createBrowser(config: AppConfig): Promise<{
   let browser: Browser;
 
   if (config.cdpUrl) {
-    logger.info(CDP接続: );
+    logger.info('CDP connect: ' + config.cdpUrl);
     browser = await chromium.connectOverCDP(config.cdpUrl);
   } else {
-    logger.info('ブラウザを起動します');
+    logger.info('Launching browser');
     browser = await chromium.launch({
       headless: config.headless,
     });
   }
 
-  const context = browser.contexts()[0] ?? await browser.newContext();
-  const page = context.pages()[0] ?? await context.newPage();
+  const context = browser.contexts()[0] ?? (await browser.newContext());
+  const page = context.pages()[0] ?? (await context.newPage());
 
   return { browser, context, page };
 }
