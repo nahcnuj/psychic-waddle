@@ -1,17 +1,43 @@
-import * as readline from 'node:readline/promises';
-import { stdin as input, stdout as output } from 'node:process';
-import type { SessionIO } from '../core/types.ts';
+﻿import * as readline from "node:readline";
+import { stdin as input, stdout as output } from "node:process";
 
-export function createConsoleIO(): SessionIO & { close: () => Promise<void> } {
-  const rl = readline.createInterface({ input, output });
+export type ConsoleIO = {
+  read: (prompt: string) => Promise<string>;
+  write: (message: string) => void;
+  close: () => Promise<void>;
+};
 
+/**
+ * 複数行を stdin から読み、EOF までを1メッセージとする。
+ * Windows では EOF は Ctrl+Z のあと Enter。
+ */
+export function createConsoleIO(): ConsoleIO {
   return {
-    read: (prompt: string) => rl.question(prompt),
-    write: (message: string) => {
+    async read(prompt: string): Promise<string> {
+      output.write(prompt);
+
+      const rl = readline.createInterface({ input, output, terminal: true });
+      const lines: string[] = [];
+
+      const text = await new Promise<string>((resolve) => {
+        rl.on("line", (line) => {
+          lines.push(line);
+        });
+        // stdin が EOF になると Interface が close する
+        rl.on("close", () => {
+          resolve(lines.join("\n"));
+        });
+      });
+
+      return text.replace(/\s+$/, "");
+    },
+
+    write(message: string) {
       console.log(message);
     },
-    close: async () => {
-      rl.close();
+
+    async close() {
+      // read のたびに Interface は close 済み
     },
   };
 }
