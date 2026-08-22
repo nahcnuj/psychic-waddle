@@ -1,4 +1,6 @@
-﻿export type ProviderName = 'x-grok';
+﻿import type { BrowserKind } from "../browsers/index.ts";
+
+export type ProviderName = "x-grok";
 
 export interface AppConfig {
   provider: ProviderName;
@@ -6,6 +8,9 @@ export interface AppConfig {
   headless: boolean;
   cdpUrl?: string;
   responseTimeoutMs: number;
+  browser: BrowserKind;
+  userDataDir?: string;
+  profileDirectory: string;
 }
 
 export interface ChatClient {

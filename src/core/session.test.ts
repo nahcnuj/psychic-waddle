@@ -1,8 +1,8 @@
-﻿import { describe, it } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { runSession } from './session.js';
-import { createFakeChatClient } from '../providers/fake.js';
-import type { SessionIO } from './types.js';
+import { runSession } from './session.ts';
+import { createFakeChatClient } from '../providers/fake.ts';
+import type { SessionIO } from './types.ts';
 
 function createScriptedIO(answers: string[]): SessionIO & { outputs: string[] } {
   const queue = [...answers];
