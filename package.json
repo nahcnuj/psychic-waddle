@@ -1,0 +1,30 @@
+{
+  "name": "psychic-waddle",
+  "description": "",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "test": "tsx --test src/**/*.test.ts",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nahcnuj/psychic-waddle.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/nahcnuj/psychic-waddle/issues"
+  },
+  "homepage": "https://github.com/nahcnuj/psychic-waddle#readme",
+  "dependencies": {
+    "playwright": "^1.62.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
