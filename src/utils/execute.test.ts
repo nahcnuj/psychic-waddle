@@ -3,9 +3,9 @@ import assert from "node:assert/strict";
 import { executeCodeBlocks } from "./execute.ts";
 
 describe("executeCodeBlocks", () => {
-  it("runs powershell and captures stdout", async () => {
+  it("runs bash and captures stdout", async () => {
     const [r] = await executeCodeBlocks([
-      { language: "powershell", code: "Write-Output 'cov-ps'" },
+      { language: "bash", code: "echo cov-ps" },
     ]);
     assert.equal(r.exitCode, 0);
     assert.match(r.stdout, /cov-ps/);
@@ -13,8 +13,8 @@ describe("executeCodeBlocks", () => {
 
   it("runs multiple blocks", async () => {
     const rs = await executeCodeBlocks([
-      { language: "powershell", code: "Write-Output a" },
-      { language: "powershell", code: "Write-Output b" },
+      { language: "bash", code: "echo a" },
+      { language: "bash", code: "echo b" },
     ]);
     assert.equal(rs.length, 2);
     assert.equal(rs[0].exitCode, 0);
