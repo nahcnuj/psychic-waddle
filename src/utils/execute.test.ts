@@ -1,4 +1,4 @@
-﻿import { describe, it } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { executeCodeBlocks } from "./execute.ts";
 
@@ -23,7 +23,7 @@ describe("executeCodeBlocks", () => {
 
   it("non-zero exit code", async () => {
     const [r] = await executeCodeBlocks([
-      { language: "powershell", code: "exit 7" },
+      { language: "node", code: "process.exit(7)" },
     ]);
     assert.equal(r.exitCode, 7);
   });
