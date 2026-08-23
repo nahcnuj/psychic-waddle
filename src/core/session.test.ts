@@ -103,7 +103,7 @@ describe("runSession", () => {
       async waitForResponse() {
         waits += 1;
         if (waits === 1) {
-          return ["```powershell", "Write-Output cov-feed", "```"].join("\n");
+          return ["```bash", "echo cov-feed", "```"].join("\n");
         }
         return "no more";
       },
@@ -128,9 +128,9 @@ describe("runSession", () => {
         waits += 1;
         // looksLikeFinished が拾う stdout をシェルで出す
         return [
-          "```powershell",
-          "Write-Output '[main abc1234] clean: test message'",
-          "Write-Output ' 1 file changed, 1 insertion(+)'",
+          "```bash",
+          "echo '[main abc1234] clean: test message'",
+          "echo ' 1 file changed, 1 insertion(+)'",
           "```",
         ].join("\n");
       },
@@ -215,3 +215,4 @@ describe("runSession", () => {
     assert.ok(io.writes.some((w) => w.includes("利用可能なモデルがありません")));
   });
 });
+
