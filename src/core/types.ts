@@ -19,6 +19,8 @@ export interface ChatClient {
   open(): Promise<void>;
   sendPrompt(prompt: string): Promise<void>;
   waitForResponse(timeoutMs?: number): Promise<string>;
+  listModels?(): Promise<string[]>;
+  selectModel?(name: string): Promise<boolean>;
   newChat?(): Promise<void>;
   getHistory?(): Promise<string[]>;
 }

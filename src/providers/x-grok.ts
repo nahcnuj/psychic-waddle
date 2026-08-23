@@ -1,6 +1,9 @@
 ﻿import type { Page, Locator } from "playwright";
 import type { ChatClient } from "../core/types.ts";
-import { sleep } from "../utils/wait.ts";
+import { setTimeout as sleep } from 'node:timers/promises';
+import { filterModelLabels, isRateLimited } from "./model-utils.ts";
+
+export { isRateLimited, filterModelLabels };
 
 async function findInput(page: Page): Promise<Locator | null> {
   const byPlaceholder = page.getByPlaceholder(/お尋ね|Ask|Grok|Message|質問/i);
@@ -8,48 +11,22 @@ async function findInput(page: Page): Promise<Locator | null> {
     const loc = byPlaceholder.last();
     if (await loc.isVisible().catch(() => false)) return loc;
   }
-
   const textareas = page.locator("textarea");
   const n = await textareas.count();
   for (let i = 0; i < n; i++) {
     const loc = textareas.nth(i);
     if (await loc.isVisible().catch(() => false)) return loc;
   }
-
   return null;
 }
 
 async function readPageText(page: Page): Promise<string> {
-  return page.evaluate(() => {
-    const body = (document.body?.innerText ?? "").trim();
-    const codeBits: string[] = [];
-    for (const el of document.querySelectorAll("pre, code")) {
-      const t = (el.textContent ?? "").trim();
-      if (t.length > 0) codeBits.push(t);
-    }
-    const fenced = codeBits
-      .filter((t, i, arr) => arr.indexOf(t) === i)
-      .filter((t) => t.length >= 3)
-      .map((t) => {
-        if (t.includes("```")) return t;
-        const lang = /Write-Output|\$[a-zA-Z]|Get-/i.test(t)
-          ? "powershell"
-          : /console\.|const |let |function /i.test(t)
-            ? "js"
-            : "";
-        return "```" + lang + "\n" + t + "\n```";
-      })
-      .join("\n\n");
-    if (!fenced) return body;
-    if (body.includes(fenced) || codeBits.every((b) => body.includes(b))) return body;
-    return body + "\n\n" + fenced;
-  });
+  return page.evaluate(() => (document.body?.innerText ?? "").trim());
 }
 
 function pageDelta(before: string, after: string): string {
   if (!before) return after;
   if (after.startsWith(before)) return after.slice(before.length).trim();
-  // 差し替え型 UI: 共通接頭を除いた差分
   let i = 0;
   const n = Math.min(before.length, after.length);
   while (i < n && before[i] === after[i]) i += 1;
@@ -58,14 +35,111 @@ function pageDelta(before: string, after: string): string {
 }
 
 function hasCodeFence(text: string): boolean {
-  return /```[\s\S]*?```/.test(text);
+  return (
+    /```[\s\S]*?```/.test(text) ||
+    /(?:^|\n)(powershell|bash|python|js|ts)\s*\n\S/i.test(text)
+  );
 }
 
 function isIntermediateResponse(text: string): boolean {
+  if (hasCodeFence(text)) return false;
   if (/thinking about your request/i.test(text)) return true;
-  if (/Thinking\.\.\./i.test(text)) return true;
+  if (/\bThinking\.\.\./i.test(text)) return true;
   if (/回答を生成中/.test(text)) return true;
   if (/考えています/.test(text)) return true;
+  return false;
+}
+
+async function openModelPicker(page: Page): Promise<void> {
+  const candidates = page.locator(
+    [
+      '[data-testid*="model" i]',
+      '[aria-label*="model" i]',
+      '[aria-label*="モデル"]',
+      'button:has-text("Auto")',
+      'button:has-text("Fast")',
+      'button:has-text("自動")',
+      'button:has-text("高速")',
+      'button:has-text("Expert")',
+      'button:has-text("エキスパート")',
+      'button:has-text("Thinking")',
+      'button:has-text("シンキング")',
+      'button:has-text("Grok")',
+    ].join(", "),
+  );
+  const n = await candidates.count();
+  for (let i = 0; i < Math.min(n, 8); i++) {
+    const el = candidates.nth(i);
+    if (!(await el.isVisible().catch(() => false))) continue;
+    await el.click({ timeout: 2000 }).catch(() => undefined);
+    await sleep(400);
+    const menu = page.locator('[role="menu"], [role="listbox"], [data-testid*="model" i]');
+    if ((await menu.count()) > 0) break;
+  }
+}
+
+export async function listModelLabels(page: Page): Promise<string[]> {
+  await openModelPicker(page);
+
+  const raw = await page.evaluate(() => {
+    const out: string[] = [];
+    const nodes = document.querySelectorAll(
+      [
+        '[role="menuitem"]',
+        '[role="option"]',
+        '[role="radio"]',
+        '[role="menuitemradio"]',
+        '[data-testid*="model" i]',
+        '[data-testid*="mode" i]',
+        'div[role="menu"] button',
+        'div[role="listbox"] button',
+        'div[role="listbox"] [role="option"]',
+      ].join(","),
+    );
+    for (const el of nodes) {
+      out.push(el.textContent ?? "");
+    }
+    if (out.length === 0) {
+      for (const el of document.querySelectorAll("button")) {
+        out.push(el.textContent ?? "");
+      }
+    }
+    return out;
+  });
+
+  await page.keyboard.press("Escape").catch(() => undefined);
+  await sleep(200);
+
+  return filterModelLabels(raw);
+}
+
+export async function selectModel(page: Page, name: string): Promise<boolean> {
+  await openModelPicker(page);
+
+  const tryClick = async (locator: Locator): Promise<boolean> => {
+    const c = await locator.count();
+    for (let i = 0; i < c; i++) {
+      const el = locator.nth(i);
+      if (!(await el.isVisible().catch(() => false))) continue;
+      await el.click({ timeout: 3000 });
+      await sleep(500);
+      return true;
+    }
+    return false;
+  };
+
+  if (await tryClick(page.getByRole("menuitem", { name, exact: true }))) return true;
+  if (await tryClick(page.getByRole("option", { name, exact: true }))) return true;
+  if (await tryClick(page.getByRole("radio", { name, exact: true }))) return true;
+  if (await tryClick(page.getByRole("button", { name, exact: true }))) return true;
+  if (await tryClick(page.getByText(name, { exact: true }))) return true;
+
+  const fuzzy = page.locator(
+    `[role="menuitem"]:has-text("${name}"), [role="option"]:has-text("${name}"), button:has-text("${name}")`,
+  );
+  if (await tryClick(fuzzy)) return true;
+
+  await page.keyboard.press("Escape").catch(() => undefined);
   return false;
 }
 
@@ -80,8 +154,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
       await page.goto(url, { waitUntil: "domcontentloaded" });
       const deadline = Date.now() + 180000;
       while (Date.now() < deadline) {
-        const input = await findInput(page);
-        if (input) return;
+        if (await findInput(page)) return;
         await sleep(1000);
       }
       throw new Error("Grok input not found (login may be required)");
@@ -90,7 +163,6 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
     async sendPrompt(prompt: string) {
       const input = await findInput(page);
       if (!input) throw new Error("Input field not found");
-
       textBeforeSend = await readPageText(page);
       await input.click();
       await sleep(200);
@@ -99,10 +171,10 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
       await page.keyboard.press("Enter");
     },
 
-    async waitForResponse(timeoutMs = 120000) {
+    async waitForResponse(timeoutMs = 180000) {
       const start = Date.now();
-      const minWaitAfterChangeMs = 5000;
-      const stableNeed = 6;
+      const minWaitAfterChangeMs = 6000;
+      const stableNeed = 8;
       let lastText = "";
       let stableCount = 0;
       let changedAt: number | null = null;
@@ -112,6 +184,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
         const current = await readPageText(page);
         const changed = current !== textBeforeSend && current.length > 0;
         const intermediate = isIntermediateResponse(current);
+        const coded = hasCodeFence(current);
 
         if (Date.now() - lastLog > 3000) {
           console.log(
@@ -124,7 +197,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
               " intermediate=" +
               intermediate +
               " hasCode=" +
-              hasCodeFence(current),
+              coded,
           );
           lastLog = Date.now();
         }
@@ -135,7 +208,6 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
           await sleep(500);
           continue;
         }
-
         if (changedAt === null) changedAt = Date.now();
 
         if (intermediate) {
@@ -149,23 +221,14 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
           stableCount += 1;
           const waitedEnough =
             changedAt !== null && Date.now() - changedAt >= minWaitAfterChangeMs;
-          const need = hasCodeFence(current) ? 3 : stableNeed;
+          const need = coded ? 3 : stableNeed;
           if (stableCount >= need && waitedEnough) {
-            return pageDelta(textBeforeSend, current);
-          }
-          if (
-            hasCodeFence(current) &&
-            stableCount >= 3 &&
-            changedAt !== null &&
-            Date.now() - changedAt >= 2500
-          ) {
             return pageDelta(textBeforeSend, current);
           }
         } else {
           lastText = current;
           stableCount = 0;
         }
-
         await sleep(500);
       }
 

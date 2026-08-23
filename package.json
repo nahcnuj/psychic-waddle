@@ -4,9 +4,10 @@
   "main": "src/index.ts",
   "scripts": {
     "start": "node bin/psychic-waddle.ts",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --test --experimental-test-coverage src/**/*.test.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:coverage": "tsx --test --experimental-test-coverage src/**/*.test.ts"
   },
   "repository": {
     "type": "git",

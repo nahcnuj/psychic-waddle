@@ -1,64 +1,218 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
-import { runSession } from './session.ts';
-import { createFakeChatClient } from '../providers/fake.ts';
-import type { SessionIO } from './types.ts';
+﻿import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { runSession } from "./session.ts";
+import type { ChatClient, SessionIO } from "./types.ts";
 
-function createScriptedIO(answers: string[]): SessionIO & { outputs: string[] } {
-  const queue = [...answers];
-  const outputs: string[] = [];
-
+function ioFrom(inputs: string[]): SessionIO & { writes: string[] } {
+  let i = 0;
+  const writes: string[] = [];
   return {
-    outputs,
-    async read(_prompt: string) {
-      if (queue.length === 0) {
-        return 'exit';
-      }
-      return queue.shift()!;
+    writes,
+    async read() {
+      return inputs[i++] ?? "exit";
     },
-    write(message: string) {
-      outputs.push(message);
+    write(m: string) {
+      writes.push(m);
     },
   };
 }
 
-describe('runSession', () => {
-  it('opens client, sends prompts, and exits on exit', async () => {
-    const sent: string[] = [];
-    const client = createFakeChatClient({
-      responses: ['hello back', 'second reply'],
-    });
-
-    const originalSend = client.sendPrompt.bind(client);
-    client.sendPrompt = async (prompt: string) => {
-      sent.push(prompt);
-      await originalSend(prompt);
+describe("runSession", () => {
+  it("waits for user prompt without boot message", async () => {
+    const prompts: string[] = [];
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt(p: string) {
+        prompts.push(p);
+      },
+      async waitForResponse() {
+        return "pong without code";
+      },
     };
-
-    const io = createScriptedIO(['', 'hello', 'second', 'exit']);
-    await runSession(client, io, { responseTimeoutMs: 1000 });
-
-    assert.deepEqual(sent, ['hello', 'second']);
-    assert.ok(io.outputs.some((line) => line.includes('hello back')));
-    assert.ok(io.outputs.some((line) => line.includes('second reply')));
+    await runSession(client, ioFrom(["hello", "exit"]), { responseTimeoutMs: 500 });
+    assert.equal(prompts[0], "hello");
+    assert.ok(prompts.some((p) => p.includes("Task is not finished")));
   });
 
-  it('continues after send error', async () => {
-    let calls = 0;
-    const client = createFakeChatClient();
-    client.sendPrompt = async () => {
-      calls += 1;
-      if (calls === 1) {
-        throw new Error('send failed');
-      }
+  it("tries all models on rate limit then surfaces last error", async () => {
+    const tried: string[] = [];
+    let waits = 0;
+    const io = ioFrom(["task", "exit"]);
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt() {},
+      async waitForResponse() {
+        waits += 1;
+        return "You've reached your limit of 40 Grok questions per 2 hours";
+      },
+      async listModels() {
+        return ["自動", "Expert", "高速"];
+      },
+      async selectModel(name: string) {
+        tried.push(name);
+        return true;
+      },
     };
-    client.waitForResponse = async () => 'ok';
+    await runSession(client, io, { responseTimeoutMs: 500 });
+    assert.deepEqual(tried, ["自動", "Expert", "高速"]);
+    assert.equal(waits, 4);
+    assert.ok(io.writes.some((w) => w.includes("利用可能なモデルがありません")));
+  });
 
-    const io = createScriptedIO(['', 'first', 'second', 'exit']);
-    await runSession(client, io, { responseTimeoutMs: 1000 });
+  it("stops model fallback when one succeeds", async () => {
+    const tried: string[] = [];
+    let waits = 0;
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt() {},
+      async waitForResponse() {
+        waits += 1;
+        if (waits === 1) return "You've reached your limit of 40 Grok questions";
+        return "ok no code";
+      },
+      async listModels() {
+        return ["A", "B", "C"];
+      },
+      async selectModel(name: string) {
+        tried.push(name);
+        return true;
+      },
+    };
+    await runSession(client, ioFrom(["task", "exit"]), { responseTimeoutMs: 500 });
+    assert.deepEqual(tried, ["A"]);
+    assert.equal(waits, 2);
+  });
 
-    assert.equal(calls, 2);
-    assert.ok(io.outputs.some((line) => line.includes('send failed')));
-    assert.ok(io.outputs.some((line) => line.includes('ok')));
+  it("after code exec feeds back results", async () => {
+    const prompts: string[] = [];
+    let waits = 0;
+    const io = ioFrom(["do", "exit"]);
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt(p: string) {
+        prompts.push(p);
+      },
+      async waitForResponse() {
+        waits += 1;
+        if (waits === 1) {
+          return ["```bash", "echo cov-feed", "```"].join("\n");
+        }
+        return "no more";
+      },
+    };
+    await runSession(client, io, { responseTimeoutMs: 5000 });
+    assert.ok(io.writes.some((w) => w.includes("コードブロック")));
+    assert.ok(prompts.some((p) => p.includes("Command results") || p.includes("exit=")));
+  });
+
+  it("stops task after commit-like success", async () => {
+    const prompts: string[] = [];
+    let waits = 0;
+    const io = ioFrom(["commit please", "exit"]);
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt(p: string) {
+        prompts.push(p);
+      },
+      async waitForResponse() {
+        waits += 1;
+        // looksLikeFinished が拾う stdout をシェルで出す
+        return [
+          "```bash",
+          "echo '[main abc1234] clean: test message'",
+          "echo ' 1 file changed, 1 insertion(+)'",
+          "```",
+        ].join("\n");
+      },
+    };
+    await runSession(client, io, { responseTimeoutMs: 5000 });
+    assert.ok(io.writes.some((w) => w.includes("commit 成功")));
+    // フィードバック継続に入らない
+    assert.ok(!prompts.some((p) => p.includes("Command results below")));
+  });
+
+  it("continues after send error", async () => {
+    let n = 0;
+    const writes: string[] = [];
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt() {
+        n += 1;
+        if (n === 1) throw new Error("send failed");
+      },
+      async waitForResponse() {
+        return "ok";
+      },
+    };
+    const inputs = ["hello", "exit"];
+    let i = 0;
+    const io: SessionIO = {
+      async read() {
+        return inputs[i++] ?? "exit";
+      },
+      write(m: string) {
+        writes.push(m);
+      },
+    };
+    await runSession(client, io, { responseTimeoutMs: 500 });
+    assert.ok(writes.some((w) => w.includes("[ERROR] send failed")));
+  });
+
+  it("rate limit with empty model list", async () => {
+    const io = ioFrom(["task", "exit"]);
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt() {},
+      async waitForResponse() {
+        return "You've reached your limit of 40 Grok questions";
+      },
+      async listModels() {
+        return [];
+      },
+      async selectModel() {
+        return false;
+      },
+    };
+    await runSession(client, io, { responseTimeoutMs: 500 });
+    assert.ok(io.writes.some((w) => w.includes("候補が見つかりません")));
+  });
+
+  it("rate limit selectModel fails then continues", async () => {
+    const tried: string[] = [];
+    const io = ioFrom(["task", "exit"]);
+    const client: ChatClient = {
+      name: "fake",
+      url: "http://x",
+      async open() {},
+      async sendPrompt() {},
+      async waitForResponse() {
+        return "You've reached your limit of 40 Grok questions";
+      },
+      async listModels() {
+        return ["X", "Y"];
+      },
+      async selectModel(name: string) {
+        tried.push(name);
+        return false;
+      },
+    };
+    await runSession(client, io, { responseTimeoutMs: 500 });
+    assert.deepEqual(tried, ["X", "Y"]);
+    assert.ok(io.writes.some((w) => w.includes("利用可能なモデルがありません")));
   });
 });
+

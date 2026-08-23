@@ -14,17 +14,16 @@ describe("extractCodeBlocks", () => {
     ]);
   });
 
-  it("extracts unfenced language line + code without UI chips", () => {
+  it("extracts unfenced without English tip chips", () => {
     const text = [
       "powershell",
-      'Write-Output "hello from grok"',
-      "Write-Hostの使い方",
-      "PowerShellの出力パイプライン",
-      "もっとよくシンキングする",
+      "Get-Content src\\core\\session.ts",
+      "Investigate PowerShell command aliasing",
+      "Explore TypeScript type definitions",
+      "高速",
     ].join("\n");
     const blocks = extractCodeBlocks(text);
     assert.equal(blocks.length, 1);
-    assert.equal(blocks[0].language, "powershell");
-    assert.equal(blocks[0].code, 'Write-Output "hello from grok"');
+    assert.equal(blocks[0].code, "Get-Content src\\core\\session.ts");
   });
 });

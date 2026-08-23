@@ -19,18 +19,18 @@ export function loadConfig(argv: string[] = process.argv.slice(2)): AppConfig {
 
   const provider = (getArg("--provider") ?? "x-grok") as ProviderName;
   const meta = PROVIDERS[provider];
-  const browser = (getArg("--browser") ?? "vivaldi") as BrowserKind;
+  const browser = (getArg("--browser") ?? "chrome") as BrowserKind;
 
   if (!(browser in BROWSERS)) {
     throw new Error(
-      "Unknown browser: " + browser + ". Available: " + Object.keys(BROWSERS).join(", ")
+      "Unknown browser: " + browser + ". Available: " + Object.keys(BROWSERS).join(", "),
     );
   }
 
   return {
     provider,
     url: getArg("--url") ?? meta.url,
-    headless: hasFlag("--headless"),
+    headless: !hasFlag("--headed"),
     cdpUrl: getArg("--cdp"),
     responseTimeoutMs: Number(getArg("--timeout") ?? 90000),
     browser,
