@@ -18,7 +18,7 @@ function formatExecFeedback(results: ExecResult[]): string {
   const parts: string[] = [
     "Command results below.",
     "Continue the task: return the NEXT code block only.",
-    "Do not stop at 完了 until the full user task is done (tests/typecheck/commit as required).",
+    "Do not stop at done until the full user task is done (tests/typecheck/commit as required).",
     "",
   ];
 
