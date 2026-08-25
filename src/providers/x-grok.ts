@@ -173,21 +173,20 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
     },
 
     async waitForResponse(timeoutMs = 180000) {
-      const start = Date.now();
       const minWaitAfterChangeMs = 6000;
       const stableNeed = 8;
       let lastText = "";
       let stableCount = 0;
       let changedAt: number | null = null;
       let lastLog = 0;
+      // Idle timeout: only fires when no new output for timeoutMs
+      let deadline = Date.now() + timeoutMs;
 
-      while (Date.now() - start < timeoutMs) {
+      while (Date.now() < deadline) {
         const current = await readPageText(page);
         const changed = current !== textBeforeSend && current.length > 0;
-        const delta = pageDelta(textBeforeSend, current);
-        const intermediate =
-          isIntermediateResponse(delta) || isIntermediateResponse(current);
-        const coded = hasCodeFence(delta);
+        const intermediate = isIntermediateResponse(current);
+        const coded = hasCodeFence(current);
 
         if (Date.now() - lastLog > 3000) {
           console.log(
@@ -211,6 +210,12 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
           await sleep(500);
           continue;
         }
+
+        // Receiving output -> extend idle deadline
+        if (current !== lastText) {
+          deadline = Date.now() + timeoutMs;
+        }
+
         if (changedAt === null) changedAt = Date.now();
 
         if (intermediate) {
@@ -226,13 +231,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
             changedAt !== null && Date.now() - changedAt >= minWaitAfterChangeMs;
           const need = coded ? 3 : stableNeed;
           if (stableCount >= need && waitedEnough) {
-            const result = pageDelta(textBeforeSend, current);
-            if (/^\.{1,10}$/.test(result.trim()) || result.trim().length < 3) {
-              stableCount = 0;
-              await sleep(500);
-              continue;
-            }
-            return result;
+            return pageDelta(textBeforeSend, current);
           }
         } else {
           lastText = current;
@@ -241,13 +240,10 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
         await sleep(500);
       }
 
-      if (lastText && !isIntermediateResponse(pageDelta(textBeforeSend, lastText))) {
-        const result = pageDelta(textBeforeSend, lastText);
-        if (!(/^\.{1,10}$/.test(result.trim()) || result.trim().length < 3)) {
-          return result;
-        }
+      if (lastText && !isIntermediateResponse(lastText)) {
+        return pageDelta(textBeforeSend, lastText);
       }
       throw new Error("Timed out waiting for response");
-    },
+    }
   };
 }
