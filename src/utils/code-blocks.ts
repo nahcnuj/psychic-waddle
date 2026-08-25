@@ -18,7 +18,7 @@ function looksLikeCodeLine(line: string): boolean {
     return false;
   }
   if (
-    /^(Explore|Investigate|Analyze|Debug|Refine|Learn|Add|Use|Fix|Include|Review|Provide|Regex|Grok API)\b/i.test(
+    /^(Explore|Investigate|Analyze|Debug|Refine|Learn|Add|Use|Fix|Include|Review|Provide|Regex|Grok API|Explain|Discuss|Describe|Summarize|Compare|List|Show|Check|Verify|Understand|Continue|Command|Do not)\b/i.test(
       t,
     ) &&
     !/[`$|<>{}()=;\\]/.test(t)
