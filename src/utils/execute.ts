@@ -51,26 +51,34 @@ export function executeCodeBlock(block: CodeBlock, timeoutMs = 60000): Promise<E
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
 
-    const timer = setTimeout(() => {
-      if (!settled) {
-        child.kill();
-        settled = true;
-        resolve({
-          language: block.language,
-          code: block.code,
-          stdout,
-          stderr: stderr + "\n[timeout]",
-          exitCode: null,
-        });
-      }
-    }, timeoutMs);
+    const armTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!settled) {
+          child.kill();
+          settled = true;
+          resolve({
+            language: block.language,
+            code: block.code,
+            stdout,
+            stderr: stderr + "\n[timeout]",
+            exitCode: null,
+          });
+        }
+      }, timeoutMs);
+    };
+
+    armTimer();
 
     child.stdout?.on("data", (d) => {
       stdout += String(d);
+      armTimer();
     });
     child.stderr?.on("data", (d) => {
       stderr += String(d);
+      armTimer();
     });
     child.on("error", (err) => {
       if (settled) return;
