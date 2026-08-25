@@ -47,6 +47,7 @@ function isIntermediateResponse(text: string): boolean {
   if (/\bThinking\.\.\./i.test(text)) return true;
   if (/回答を生成中/.test(text)) return true;
   if (/考えています/.test(text)) return true;
+  if (/^\.{1,10}$/.test(text.trim())) return true;
   return false;
 }
 
@@ -183,8 +184,10 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
       while (Date.now() - start < timeoutMs) {
         const current = await readPageText(page);
         const changed = current !== textBeforeSend && current.length > 0;
-        const intermediate = isIntermediateResponse(current);
-        const coded = hasCodeFence(current);
+        const delta = pageDelta(textBeforeSend, current);
+        const intermediate =
+          isIntermediateResponse(delta) || isIntermediateResponse(current);
+        const coded = hasCodeFence(delta);
 
         if (Date.now() - lastLog > 3000) {
           console.log(
@@ -223,7 +226,13 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
             changedAt !== null && Date.now() - changedAt >= minWaitAfterChangeMs;
           const need = coded ? 3 : stableNeed;
           if (stableCount >= need && waitedEnough) {
-            return pageDelta(textBeforeSend, current);
+            const result = pageDelta(textBeforeSend, current);
+            if (/^\.{1,10}$/.test(result.trim()) || result.trim().length < 3) {
+              stableCount = 0;
+              await sleep(500);
+              continue;
+            }
+            return result;
           }
         } else {
           lastText = current;
@@ -232,8 +241,11 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
         await sleep(500);
       }
 
-      if (lastText && !isIntermediateResponse(lastText)) {
-        return pageDelta(textBeforeSend, lastText);
+      if (lastText && !isIntermediateResponse(pageDelta(textBeforeSend, lastText))) {
+        const result = pageDelta(textBeforeSend, lastText);
+        if (!(/^\.{1,10}$/.test(result.trim()) || result.trim().length < 3)) {
+          return result;
+        }
       }
       throw new Error("Timed out waiting for response");
     },
