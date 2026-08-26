@@ -33,7 +33,7 @@ describe("runSession", () => {
     };
     await runSession(client, ioFrom(["hello", "exit"]), { responseTimeoutMs: 500 });
     assert.equal(prompts[0], "hello");
-    assert.ok(prompts.some((p) => p.includes("Task is not finished")));
+    assert.ok(prompts.some((p) => p.includes("No executable code block was found")));
   });
 
   it("tries all models on rate limit then surfaces last error", async () => {
@@ -110,7 +110,7 @@ describe("runSession", () => {
     };
     await runSession(client, io, { responseTimeoutMs: 5000 });
     assert.ok(io.writes.some((w) => w.includes("コードブロック")));
-    assert.ok(prompts.some((p) => p.includes("Command results") || p.includes("exit=")));
+    assert.ok(prompts.some((p) => p.includes("Execution results") || p.includes("exit=")));
   });
 
   it("stops task after commit-like success", async () => {
