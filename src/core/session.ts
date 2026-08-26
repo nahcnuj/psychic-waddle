@@ -8,17 +8,17 @@ export type SessionOptions = {
 };
 
 const CONTINUE_NUDGE = [
-  "Task is not finished.",
-  "Return the next executable code block only (powershell).",
+  "No executable code block was found in the last response.",
+  "Please output ONLY the next runnable code block (prefer powershell on Windows).",
   "No explanations.",
-  "Continue until tests/typecheck pass and required commit is done.",
+  "Continue until tests/typecheck pass and a PR is created.",
 ].join("\n");
 
 function formatExecFeedback(results: ExecResult[]): string {
   const parts: string[] = [
-    "Command results below.",
+    "Execution results (continue; return NEXT code block only):",
     "Continue the task: return the NEXT code block only.",
-    "Do not stop at done until the full user task is done (tests/typecheck/commit as required).",
+    "Continue until tests/typecheck pass and a PR is opened.",
     "",
   ];
 
@@ -38,7 +38,7 @@ function looksLikeFinished(results: ExecResult[]): boolean {
   return results.some(
     (r) =>
       r.exitCode === 0 &&
-      (/\[(main|master).+\].+/.test(r.stdout) || /files? changed/i.test(r.stdout)),
+      (/\[(main|master).+\].+/.test(r.stdout) || /files? changed/i.test(r.stdout) || /pull request created/i.test(r.stdout) || /Creating pull request/i.test(r.stdout)),
   );
 }
 
