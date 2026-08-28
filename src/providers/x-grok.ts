@@ -151,6 +151,14 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
     name: "x-grok",
     url,
 
+    async listModels() {
+      return listModelLabels(page);
+    },
+
+    async selectModel(name) {
+      return selectModel(page, name);
+    },
+
     async open() {
       await page.goto(url, { waitUntil: "domcontentloaded" });
       const deadline = Date.now() + 180000;
