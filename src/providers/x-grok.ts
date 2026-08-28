@@ -172,6 +172,14 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
       await page.keyboard.press("Enter");
     },
 
+    async listModels() {
+      return listModelLabels(page);
+    },
+
+    async selectModel(name: string) {
+      return selectModel(page, name);
+    },
+
     async waitForResponse(timeoutMs = 180000) {
       const minWaitAfterChangeMs = 6000;
       const stableNeed = 8;
