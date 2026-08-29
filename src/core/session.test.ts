@@ -113,35 +113,15 @@ describe("runSession", () => {
     assert.ok(prompts.some((p) => p.includes("Execution results") || p.includes("exit=")));
   });
 
-  it("stops task after commit-like success", async () => {
+    it("stops task after PR status passed", async () => {
     const prompts: string[] = [];
-    let waits = 0;
-    const io = ioFrom(["commit please", "exit"]);
-    const client: ChatClient = {
-      name: "fake",
-      url: "http://x",
-      async open() {},
-      async sendPrompt(p: string) {
-        prompts.push(p);
-      },
-      async waitForResponse() {
-        waits += 1;
-        // looksLikeFinished が拾う stdout をシェルで出す
-        return [
-          "```bash",
-          "echo '[main abc1234] clean: test message'",
-          "echo ' 1 file changed, 1 insertion(+)'",
-          "```",
-        ].join("\n");
-      },
-    };
+    const io = ioFrom(["open pr", "exit"]);
+    const client = { name: "fake", url: "http://x", async open() {}, async sendPrompt(p: string) { prompts.push(p); }, async waitForResponse() { return ["```bash","echo Creating pull request","echo https://github.com/nahcnuj/psychic-waddle/pull/99","echo All checks have passed","```"].join(String.fromCharCode(10)); } };
     await runSession(client, io, { responseTimeoutMs: 5000 });
-    assert.ok(io.writes.some((w) => w.includes("commit 成功")));
-    // フィードバック継続に入らない
-    assert.ok(!prompts.some((p) => p.includes("Command results below")));
+    if (!io.writes.some((w) => w.includes("PR status passed"))) throw new Error("missing finish log");
+    if (prompts.some((p) => p.includes("Command results below"))) throw new Error("should not continue");
   });
-
-  it("continues after send error", async () => {
+it("continues after send error", async () => {
     let n = 0;
     const writes: string[] = [];
     const client: ChatClient = {

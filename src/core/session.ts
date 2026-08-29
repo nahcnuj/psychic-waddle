@@ -35,13 +35,11 @@ function formatExecFeedback(results: ExecResult[]): string {
 }
 
 function looksLikeFinished(results: ExecResult[]): boolean {
-  return results.some(
-    (r) =>
-      r.exitCode === 0 &&
-      (/\[(main|master).+\].+/.test(r.stdout) || /files? changed/i.test(r.stdout) || /pull request created/i.test(r.stdout) || /Creating pull request/i.test(r.stdout)),
-  );
+  const text = results.map((r) => r.stdout + String.fromCharCode(10) + r.stderr).join(String.fromCharCode(10));
+  const hasPr = /https:\/\/github\.com\/[^\s]+\/pull\/\d+/i.test(text) || /pull request (created|opened)/i.test(text) || /Creating pull request/i.test(text);
+  const passed = /All checks (have )?passed/i.test(text) || /\b(status|checks?)\b[^\n]*\bpassed\b/i.test(text);
+  return results.every((r) => r.exitCode === 0) && hasPr && passed;
 }
-
 async function sendAndWait(
   client: ChatClient,
   io: SessionIO,
@@ -185,7 +183,7 @@ export async function runSession(
       }
 
       if (looksLikeFinished(results)) {
-        io.write("[INFO] commit 成功を検出。ユーザー入力待ちに戻ります。");
+        io.write("[INFO] PR status passed を検出。ユーザー入力待ちに戻ります。");
         inTask = false;
         autoContinueLeft = 0;
         pending = null;
