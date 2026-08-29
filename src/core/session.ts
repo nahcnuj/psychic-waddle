@@ -1,4 +1,4 @@
-﻿import type { ChatClient, SessionIO } from "./types.ts";
+import type { ChatClient, SessionIO } from "./types.ts";
 import { blockKey, extractCodeBlocks } from "../utils/code-blocks.ts";
 import { executeCodeBlocks, type ExecResult } from "../utils/execute.ts";
 import { isRateLimited } from "../providers/x-grok.ts";
@@ -7,27 +7,24 @@ export type SessionOptions = {
   responseTimeoutMs: number;
 };
 
-const CONTINUE_NUDGE = [
-  "No executable code block was found in the last response.",
-  "Please output ONLY the next runnable code block (prefer powershell on Windows).",
-  "No explanations.",
-  "Continue until tests/typecheck pass and a PR is created.",
+export const CONTINUE_NUDGE = [
+  "Need the next runnable code block to continue this task (prefer powershell on Windows).",
+  "Goal: tests/typecheck pass and a pull request is opened.",
 ].join("\n");
 
-function formatExecFeedback(results: ExecResult[]): string {
+export function formatExecFeedback(results: ExecResult[]): string {
   const parts: string[] = [
-    "Execution results (continue; return NEXT code block only):",
-    "Continue the task: return the NEXT code block only.",
+    "These outputs came from executing the code blocks below, in order.",
+    "Continue the original coding task. Return ONLY the next runnable code block.",
     "Continue until tests/typecheck pass and a PR is opened.",
     "",
   ];
 
   for (const r of results) {
-    parts.push("--- exec [" + (r.language || "shell") + "] exit=" + String(r.exitCode) + " ---");
-    parts.push("stdout:");
-    parts.push(r.stdout.trimEnd() || "(empty)");
-    parts.push("stderr:");
-    parts.push(r.stderr.trimEnd() || "(empty)");
+    parts.push("Executed [" + (r.language || "shell") + "] exit=" + String(r.exitCode));
+    parts.push(r.code.replace(/\s+$/, ""));
+    parts.push("output:");
+    parts.push((r.output ?? (r.stdout + r.stderr)).trimEnd() || "(empty)");
     parts.push("");
   }
 
@@ -35,11 +32,19 @@ function formatExecFeedback(results: ExecResult[]): string {
 }
 
 function looksLikeFinished(results: ExecResult[]): boolean {
-  const text = results.map((r) => r.stdout + String.fromCharCode(10) + r.stderr).join(String.fromCharCode(10));
-  const hasPr = /https:\/\/github\.com\/[^\s]+\/pull\/\d+/i.test(text) || /pull request (created|opened)/i.test(text) || /Creating pull request/i.test(text);
-  const passed = /All checks (have )?passed/i.test(text) || /\b(status|checks?)\b[^\n]*\bpassed\b/i.test(text);
+  const text = results
+    .map((r) => r.output ?? (r.stdout + String.fromCharCode(10) + r.stderr))
+    .join(String.fromCharCode(10));
+  const hasPr =
+    /https:\/\/github\.com\/[^\s]+\/pull\/\d+/i.test(text) ||
+    /pull request (created|opened)/i.test(text) ||
+    /Creating pull request/i.test(text);
+  const passed =
+    /All checks (have )?passed/i.test(text) ||
+    /\b(status|checks?)\b[^\n]*\bpassed\b/i.test(text);
   return results.every((r) => r.exitCode === 0) && hasPr && passed;
 }
+
 async function sendAndWait(
   client: ChatClient,
   io: SessionIO,
@@ -54,7 +59,6 @@ async function sendAndWait(
 
 type SendResult = {
   response: string;
-  /** レート制限を検知しモデル切替を経た */
   usedModelFallback: boolean;
 };
 
@@ -155,7 +159,6 @@ export async function runSession(
       const blocks = extractCodeBlocks(response).filter((b) => !executed.has(blockKey(b)));
 
       if (blocks.length === 0) {
-        // レート制限回避直後のコードなしは継続しない（モデル切替の結果をユーザーに返す）
         if (usedModelFallback) {
           inTask = false;
           autoContinueLeft = 0;
@@ -176,9 +179,10 @@ export async function runSession(
       io.write("コードブロック " + blocks.length + " 件を実行します...");
       const results = await executeCodeBlocks(blocks);
       for (const r of results) {
-        io.write("--- exec [" + (r.language || "shell") + "] exit=" + String(r.exitCode) + " ---");
-        if (r.stdout.trim()) io.write(r.stdout.trimEnd());
-        if (r.stderr.trim()) io.write("[stderr]\n" + r.stderr.trimEnd());
+        io.write("Executed [" + (r.language || "shell") + "] exit=" + String(r.exitCode));
+        io.write(r.code.replace(/\s+$/, ""));
+        const combined = (r.output ?? (r.stdout + r.stderr)).trimEnd();
+        if (combined) io.write(combined);
         io.write("");
       }
 

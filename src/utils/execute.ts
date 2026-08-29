@@ -1,4 +1,4 @@
-﻿import { spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import type { CodeBlock } from "./code-blocks.ts";
 
 export type ExecResult = {
@@ -6,6 +6,7 @@ export type ExecResult = {
   code: string;
   stdout: string;
   stderr: string;
+  output: string;
   exitCode: number | null;
 };
 
@@ -32,7 +33,6 @@ function commandFor(block: CodeBlock): { file: string; args: string[]; input?: s
     return { file: "python", args: ["-c", code] };
   }
 
-  // 言語タグなし / 不明: シェルとして実行（Windows は powershell）
   if (process.platform === "win32") {
     return { file: "powershell", args: ["-NoProfile", "-Command", code] };
   }
@@ -50,6 +50,7 @@ export function executeCodeBlock(block: CodeBlock, timeoutMs = 60000): Promise<E
 
     let stdout = "";
     let stderr = "";
+    let output = "";
     let settled = false;
     let timer: ReturnType<typeof setTimeout>;
 
@@ -64,6 +65,7 @@ export function executeCodeBlock(block: CodeBlock, timeoutMs = 60000): Promise<E
             code: block.code,
             stdout,
             stderr: stderr + "\n[timeout]",
+            output: output + "\n[timeout]",
             exitCode: null,
           });
         }
@@ -73,22 +75,28 @@ export function executeCodeBlock(block: CodeBlock, timeoutMs = 60000): Promise<E
     armTimer();
 
     child.stdout?.on("data", (d) => {
-      stdout += String(d);
+      const s = String(d);
+      stdout += s;
+      output += s;
       armTimer();
     });
     child.stderr?.on("data", (d) => {
-      stderr += String(d);
+      const s = String(d);
+      stderr += s;
+      output += s;
       armTimer();
     });
     child.on("error", (err) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      const extra = String(err);
       resolve({
         language: block.language,
         code: block.code,
         stdout,
-        stderr: stderr + String(err),
+        stderr: stderr + extra,
+        output: output + extra,
         exitCode: 1,
       });
     });
@@ -101,6 +109,7 @@ export function executeCodeBlock(block: CodeBlock, timeoutMs = 60000): Promise<E
         code: block.code,
         stdout,
         stderr,
+        output,
         exitCode: code,
       });
     });
