@@ -202,12 +202,6 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
 
         if (changedAt === null) changedAt = Date.now();
 
-        if (intermediate) {
-          stableCount = 0;
-          lastText = current;
-          await sleep(500);
-          continue;
-        }
 
         if (current === lastText) {
           stableCount += 1;
@@ -231,4 +225,5 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
     }
   };
 }
+
 
