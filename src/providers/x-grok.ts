@@ -2,6 +2,7 @@
 import type { ChatClient } from "../core/types.ts";
 import { setTimeout as sleep } from 'node:timers/promises';
 import { filterModelLabels, isRateLimited } from "./model-utils.ts";
+import { hasCodeFence, isIntermediateResponse, isOutputComplete } from "./response-complete.ts";
 
 export { isRateLimited, filterModelLabels };
 
@@ -32,23 +33,6 @@ function pageDelta(before: string, after: string): string {
   while (i < n && before[i] === after[i]) i += 1;
   const delta = after.slice(i).trim();
   return delta.length > 0 ? delta : after;
-}
-
-function hasCodeFence(text: string): boolean {
-  return (
-    /```[\s\S]*?```/.test(text) ||
-    /(?:^|\n)(powershell|bash|python|js|ts)\s*\n\S/i.test(text)
-  );
-}
-
-function isIntermediateResponse(text: string): boolean {
-  if (hasCodeFence(text)) return false;
-  if (/thinking about your request/i.test(text)) return true;
-  if (/\bThinking\.\.\./i.test(text)) return true;
-  if (/回答を生成中/.test(text)) return true;
-  if (/考えています/.test(text)) return true;
-  if (/^\.{1,10}$/.test(text.trim())) return true;
-  return false;
 }
 
 async function openModelPicker(page: Page): Promise<void> {
@@ -230,7 +214,7 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
           const waitedEnough =
             changedAt !== null && Date.now() - changedAt >= minWaitAfterChangeMs;
           const need = coded ? 3 : stableNeed;
-          if (stableCount >= need && waitedEnough) {
+          const complete = isOutputComplete({ text: current, textBeforeSend, stopControlVisible: false, composerEnabled: true, generatingIndicatorVisible: intermediate }); if (stableCount >= need && waitedEnough && complete) {
             return pageDelta(textBeforeSend, current);
           }
         } else {
@@ -247,3 +231,4 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
     }
   };
 }
+
