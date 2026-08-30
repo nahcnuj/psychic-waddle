@@ -222,7 +222,13 @@ export function createXGrokClient(page: Page, url: string): ChatClient {
         return pageDelta(textBeforeSend, lastText);
       }
       throw new Error("Timed out waiting for response");
-    }
+    },
+    async listModels() {
+      return listModelLabels(page);
+    },
+    async selectModel(name: string) {
+      return selectModel(page, name);
+    },
   };
 }
 
