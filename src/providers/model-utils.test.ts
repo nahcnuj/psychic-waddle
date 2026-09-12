@@ -1,4 +1,4 @@
-﻿import { describe, it } from "node:test";
+import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { filterModelLabels, isRateLimited } from "./model-utils.ts";
 
@@ -44,5 +44,25 @@ describe("filterModelLabels", () => {
 
   it("drops empty and too long", () => {
     assert.deepEqual(filterModelLabels(["", "x", "a".repeat(50)]), []);
+  });
+
+  it("drops suggestion chips and thinking UI from issue 37", () => {
+    const labels = filterModelLabels([
+      "github.com",
+      "シンキング結果",
+      "Explore biome plugin configuration",
+      "Investigate biome lint rules",
+      "Explain biome lint rules",
+      "Fix PowerShell syntax errors",
+      "Return only the next runnable code block",
+      "6秒間シンキングしました",
+      "PowerShell Error Handling",
+      "Git Branch Management",
+      "Commit and open PR for all changes",
+      "Grok 4",
+      "自動",
+      "Expert",
+    ]);
+    assert.deepEqual(labels, ["Grok 4", "自動", "Expert"]);
   });
 });

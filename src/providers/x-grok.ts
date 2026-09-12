@@ -1,4 +1,4 @@
-﻿import type { Page, Locator } from "playwright";
+import type { Page, Locator } from "playwright";
 import type { ChatClient } from "../core/types.ts";
 import { setTimeout as sleep } from 'node:timers/promises';
 import { filterModelLabels, isRateLimited } from "./model-utils.ts";
@@ -84,11 +84,7 @@ export async function listModelLabels(page: Page): Promise<string[]> {
     for (const el of nodes) {
       out.push(el.textContent ?? "");
     }
-    if (out.length === 0) {
-      for (const el of document.querySelectorAll("button")) {
-        out.push(el.textContent ?? "");
-      }
-    }
+
     return out;
   });
 
